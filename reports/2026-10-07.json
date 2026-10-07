@@ -1,0 +1,252 @@
+[
+  {
+    "name": "千劫神屠",
+    "marketHashName": "Feast of Abscession",
+    "c5Price": 104.99,
+    "c5PurchasePrice": 115,
+    "c5ItemId": "553467895",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Feast%20of%20Abscession",
+    "quoteAt": "2026-10-07T08:57:14.7352905Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 125.88",
+      "volume": "86",
+      "median_price": "¥ 119.01"
+    },
+    "bookAt": "2026-10-07T09:06:18.7006488Z",
+    "book": {
+      "currency": 11,
+      "bid": 7024,
+      "ask": 7033,
+      "totalBuy": 526,
+      "topQuantity": 3,
+      "at": 1791363978700
+    }
+  },
+  {
+    "name": "坍雪寒裘",
+    "marketHashName": "Frost Avalanche",
+    "c5Price": 92,
+    "c5PurchasePrice": 84,
+    "c5ItemId": "18042",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Frost%20Avalanche",
+    "quoteAt": "2026-10-07T08:57:57.0647311Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 102.26",
+      "volume": "87",
+      "median_price": "¥ 108.58"
+    },
+    "bookAt": "2026-10-07T09:07:00.9524354Z",
+    "book": {
+      "currency": 11,
+      "bid": 6038,
+      "ask": 6206,
+      "totalBuy": 1495,
+      "topQuantity": 3,
+      "at": 1791364020952
+    }
+  },
+  {
+    "name": "心渊魔角",
+    "marketHashName": "Fractal Horns of Inner Abysm",
+    "c5Price": 204,
+    "c5PurchasePrice": 194,
+    "c5ItemId": "1907",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Fractal%20Horns%20of%20Inner%20Abysm",
+    "quoteAt": "2026-10-07T08:57:30.7344090Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 227.49",
+      "volume": "212",
+      "median_price": "¥ 224.00"
+    },
+    "bookAt": "2026-10-07T09:06:34.6002562Z",
+    "book": {
+      "currency": 11,
+      "bid": 13482,
+      "ask": 13705,
+      "totalBuy": 2766,
+      "topQuantity": 2,
+      "at": 1791363994600
+    }
+  },
+  {
+    "name": "无双诡魅",
+    "marketHashName": "Manifold Paradox",
+    "c5Price": 116.8,
+    "c5PurchasePrice": 116,
+    "c5ItemId": "17915",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Manifold%20Paradox",
+    "quoteAt": "2026-10-07T08:57:25.3498871Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 128.16",
+      "volume": "207",
+      "median_price": "¥ 132.91"
+    },
+    "bookAt": "2026-10-07T09:06:29.1765867Z",
+    "book": {
+      "currency": 11,
+      "bid": 7776,
+      "ask": 7879,
+      "totalBuy": 3273,
+      "topQuantity": 28,
+      "at": 1791363989176
+    }
+  },
+  {
+    "name": "沉舰豚炮",
+    "marketHashName": "Swine of the Sunken Galley",
+    "c5Price": 161.19,
+    "c5PurchasePrice": 147,
+    "c5ItemId": "19586",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Swine%20of%20the%20Sunken%20Galley",
+    "quoteAt": "2026-10-07T08:57:51.8421433Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 173.43",
+      "volume": "11",
+      "median_price": "¥ 283.16"
+    },
+    "bookAt": "2026-10-07T09:06:55.7394989Z",
+    "book": {
+      "currency": 11,
+      "bid": 10451,
+      "ask": 10526,
+      "totalBuy": 614,
+      "topQuantity": 10,
+      "at": 1791364015739
+    }
+  },
+  {
+    "name": "噬魔之王",
+    "marketHashName": "Demon Eater",
+    "c5Price": 106.7,
+    "c5PurchasePrice": 103,
+    "c5ItemId": "17952",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Demon%20Eater",
+    "quoteAt": "2026-10-07T08:57:46.4559935Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 112.58",
+      "volume": "115",
+      "median_price": "¥ 119.34"
+    },
+    "bookAt": "2026-10-07T09:06:50.3704718Z",
+    "book": {
+      "currency": 11,
+      "bid": 6766,
+      "ask": 6834,
+      "totalBuy": 998,
+      "topQuantity": 2,
+      "at": 1791364010370
+    }
+  },
+  {
+    "name": "擎天大圣",
+    "marketHashName": "Great Sage's Reckoning",
+    "c5Price": 118.59,
+    "c5PurchasePrice": 111,
+    "c5ItemId": "534630079",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Great%20Sage's%20Reckoning",
+    "quoteAt": "2026-10-07T08:57:35.9825344Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 123.39",
+      "volume": "79",
+      "median_price": "¥ 125.80"
+    },
+    "bookAt": "2026-10-07T09:06:39.8546201Z",
+    "book": {
+      "currency": 11,
+      "bid": 7430,
+      "ask": 7431,
+      "totalBuy": 1073,
+      "topQuantity": 1,
+      "at": 1791363999854
+    }
+  },
+  {
+    "name": "魔导士炽魂",
+    "marketHashName": "Fiery Soul of the Slayer",
+    "c5Price": 141.98,
+    "c5PurchasePrice": 137,
+    "c5ItemId": "1928",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Fiery%20Soul%20of%20the%20Slayer",
+    "quoteAt": "2026-10-07T08:57:09.5013552Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 141.53",
+      "volume": "84",
+      "median_price": "¥ 142.99"
+    },
+    "bookAt": "2026-10-07T09:06:13.4435323Z",
+    "book": {
+      "currency": 11,
+      "bid": 8444,
+      "ask": 8574,
+      "totalBuy": 1861,
+      "topQuantity": 1,
+      "at": 1791363973443
+    }
+  },
+  {
+    "name": "战鬼双刃",
+    "marketHashName": "Blades of Voth Domosh",
+    "c5Price": 186,
+    "c5PurchasePrice": 143,
+    "c5ItemId": "2770",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Blades%20of%20Voth%20Domosh",
+    "quoteAt": "2026-10-07T08:57:41.2096489Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 187.37",
+      "volume": "54",
+      "median_price": "¥ 184.01"
+    },
+    "bookAt": "2026-10-07T09:06:45.1327547Z",
+    "book": {
+      "currency": 11,
+      "bid": 9226,
+      "ask": 11373,
+      "totalBuy": 858,
+      "topQuantity": 2,
+      "at": 1791364005132
+    }
+  },
+  {
+    "name": "剑心之遗",
+    "marketHashName": "Bladeform Legacy",
+    "c5Price": 145.99,
+    "c5PurchasePrice": 137,
+    "c5ItemId": "553481550",
+    "c5Source": "https://www.c5game.com/",
+    "priceSource": "https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=Bladeform%20Legacy",
+    "quoteAt": "2026-10-07T08:57:20.1249730Z",
+    "quote": {
+      "success": true,
+      "lowest_price": "¥ 141.61",
+      "volume": "115",
+      "median_price": "¥ 139.86"
+    },
+    "bookAt": "2026-10-07T09:06:23.9533142Z",
+    "book": {
+      "currency": 11,
+      "bid": 8427,
+      "ask": 8330,
+      "totalBuy": 425,
+      "topQuantity": 2,
+      "at": 1791363983953
+    }
+  }
+]
