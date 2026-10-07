@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         C5 DOTA2 Steam 余额比例分析
 // @namespace    https://github.com/imbafu/c5-steam-ratio
-// @version      0.3.1
+// @version      0.3.2
 // @description  C5 刀塔2列表的比例、费后余额、成交活跃度与候选筛选；手动低频查询
 // @match        https://www.c5game.com/*
 // @match        https://c5game.com/*
@@ -211,7 +211,7 @@
       if (!tag) { tag = document.createElement('div'); tag.className = 'c5sr-tag'; c.card.append(tag); }
       tag.classList.toggle('c5sr-candidate', !!a?.candidate);
       const bookText = q?.book && a?.bookFresh ? `求购 ${q.book.currency === 23 ? 'CNY' : q.book.currency === 11 ? 'MYR' : '币种#'+q.book.currency} ${(q.book.bid/100).toFixed(2)} · 顶档 ${q.book.topQuantity ?? '未知'}件 / 总求购 ${q.book.totalBuy ?? '未知'}件\n盘口价差 ${a.spread === null ? '未知' : a.spread.toFixed(1)+'%'} · 求购成本比例 ${a.bidDiscount === null ? '币种未确认' : a.bidDiscount.toFixed(3)}` : '求购盘口未查询或已过期，暂不推荐';
-      tag.textContent = !c.hash ? '未找到精确市场名，暂不估算' : !a ? (c.error || 'Steam报价未查询') : `${a.instant ? '★ 求购可成交候选' : a.candidate ? '★ 挂售候选（需等成交）' : a.watch ? '价格可考虑 · 流动性待核验' : '未达推荐条件'}${a.fresh ? '' : ' · 报价已过期'}\nC5 ${money(c.price)} · 估算挂售到账 ${money(a.net)}\n成本 ÷ 扣费到账 = ${a.discount.toFixed(3)} · ${a.referenceMet?'达到参考值':'高于参考值，但不因此排除'}\n参考比例买价上限 ${money(a.maxBuyPrice)} · 余额增量 ${money(a.gain)}\n近期成交 ${q.volume ?? '未知'} · 中位价偏差 ${a.gap === null ? '未知' : a.gap.toFixed(1) + '%'}\n${bookText}${special ? ' · 特殊属性需核验' : ''}${c.error ? '\n'+c.error : ''}`;
+      tag.textContent = !c.hash ? '未找到精确市场名，暂不估算' : !a ? (c.error || 'Steam报价未查询') : `${a.instant ? '★ 求购可成交候选' : a.candidate ? '★ 挂售候选（需等成交）' : a.watch ? '价格可考虑 · 流动性待核验' : '未达推荐条件'}${a.fresh ? '' : ' · 报价已过期'}\nC5 ${money(c.price)} · 估算挂售到账 ${money(a.net)}\n成本 ÷ 扣费到账 = ${a.discount.toFixed(3)} · ${a.referenceMet?'达到参考值':'高于参考值，但不因此排除'}\nSteam最低挂单 ${money(q.lowest)} · 成交中位价 ${money(q.median)}\n估算售价取两者较低值，再折让${settings.haircut}%并扣手续费\n参考比例买价上限 ${money(a.maxBuyPrice)} · 余额增量 ${money(a.gain)}\n近期成交 ${q.volume ?? '未知'} · 中位价偏差 ${a.gap === null ? '未知' : a.gap.toFixed(1) + '%'}\n${bookText}${special ? ' · 特殊属性需核验' : ''}${c.error ? '\n'+c.error : ''}`;
       tag.style.whiteSpace = 'pre-line';
       tag.title = q ? `报价时间：${new Date(q.at).toLocaleString()}；Steam最低挂单价与中位价取低，再折让${settings.haircut}%，扣手续费。挂售到账属于估算；求购到账只适用于当前顶档数量。` : '';
       c.col.classList.toggle('c5sr-hidden', settings.only && !a?.candidate);
@@ -224,14 +224,14 @@
       ranked.sort((x,y) => (settings.sort === 'volume' ? (y.q.volume ?? -1)-(x.q.volume ?? -1) : settings.sort === 'gain' ? y.a.gain-x.a.gain : (x.a[settings.sort] ?? Infinity)-(y.a[settings.sort] ?? Infinity)) || x.c.index-y.c.index);
       if (!ranked.some(x=>x.a.candidate)) { const empty=document.createElement('p'); empty.textContent='暂无符合门槛且流动性已核验的推荐。下方是待核验/未达标对照，不代表建议买入。'; ranking.append(empty); }
       const table=document.createElement('table'); const head=document.createElement('tr');
-      for(const label of ['状态','饰品','买入价','挂售到账估算','成本比例','近期成交量','求购到账','顶档件数','达到参考值的买价上限']) { const th=document.createElement('th'); th.textContent=label; head.append(th); }
+      for(const label of ['状态','饰品','买入价','挂售到账估算','成本比例','近期成交量','求购到账','顶档件数','达到参考值的买价上限','Steam最低挂单（含手续费）','Steam成交中位价','当前盘口最低挂单（含手续费）']) { const th=document.createElement('th'); th.textContent=label; head.append(th); }
       table.append(head);
       for (const { c, a } of ranked.filter(x => x.c.price >= settings.minPrice && (!settings.only || x.a.candidate))) {
         const row = document.createElement('tr'), link = document.createElement('a');
         link.href = c.col.querySelector('a').href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = c.name;
         const steam = document.createElement('a'); steam.href=`https://steamcommunity.com/market/listings/570/${encodeURIComponent(c.hash)}`; steam.target='_blank'; steam.rel='noopener noreferrer'; steam.textContent='Steam核验';
         const q=cached(c.hash);
-        const values=[a.instant?'求购可成交候选':a.candidate?'挂售候选':'待核验/未达标',null,money(c.price),money(a.net),a.discount.toFixed(3),q?.volume??'未知',money(a.bidNet),a.bookFresh?q?.book?.topQuantity??'未知':'未知',money(a.maxBuyPrice)];
+        const values=[a.instant?'求购可成交候选':a.candidate?'挂售候选':'待核验/未达标',null,money(c.price),money(a.net),a.discount.toFixed(3),q?.volume??'未知',money(a.bidNet),a.bookFresh?q?.book?.topQuantity??'未知':'未知',money(a.maxBuyPrice),money(q?.lowest),money(q?.median),a.bookFresh && q?.book?.currency===23 ? money(q.book.ask/100) : '未知'];
         for(let i=0;i<values.length;i++){const td=document.createElement('td');if(i===1)td.append(link,steam);else td.textContent=values[i];row.append(td);}
         if(!a.fresh) row.firstChild.textContent='报价已过期';
         table.append(row);
@@ -301,5 +301,6 @@
   setInterval(() => { if (panel.isConnected && !running) render(); },15000);
   scan();
 })();
+
 
 
