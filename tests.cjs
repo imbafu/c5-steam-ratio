@@ -45,8 +45,8 @@ const waitBook={...book,bid:14300,ask:15000};
 assert.equal(analyze(124.5,{...q,book:waitBook},defaults,1000).candidate,true);
 assert.equal(analyze(124.5,{...q,book:waitBook},defaults,1000).instant,false);
 const expensive={lowest:500,median:490,volume:100,at:1000,book:{...book,bid:48000,ask:50000}};
-assert.equal(analyze(250,expensive,appDefaults,1000).candidate,false);
-assert.equal(analyze(250.01,expensive,appDefaults,1000).candidate,true);
+assert.equal(analyze(199.99,expensive,appDefaults,1000).candidate,false);
+assert.equal(analyze(200,expensive,appDefaults,1000).candidate,true);
 assert.equal(analyze(400,expensive,appDefaults,1000).candidate,true);
 assert.equal(analyze(400,expensive,appDefaults,1000).referenceMet,false);
 assert.throws(()=>parseBook({data:{success:true,data:{eCurrency:23,amtMaxBuyOrder:'14500'}}}));
@@ -104,8 +104,7 @@ if (process.argv.includes('--browser')) (async () => {
     await page.locator('#c5sr-panel select').selectOption('discount');
     assert.ok(await page.locator('.c5sr-ranking a').count() > 0);
     const rows=await page.locator('.c5sr-ranking tr').evaluateAll(rows=>rows.slice(1).map(r=>({price:Number(r.children[2].textContent.replace('¥','')),cost:Number(r.children[4].textContent)})));
-    for(const expensive of [true,false]){const costs=rows.filter(r=>(r.price>250)===expensive).map(r=>r.cost);assert.ok(costs.every((v,i)=>i===0||v>=costs[i-1]),'cost ratio must sort ascending within price preference');}
-    assert.ok(rows.findIndex(r=>r.price<=250)>rows.map(r=>r.price>250).lastIndexOf(true),'items above 250 must come first');
+    assert.ok(rows.every((r,i)=>r.price>=200 && (i===0 || r.cost>=rows[i-1].cost)),'all rows meet minimum and sort by ascending ratio');
     assert.match(await page.locator('.c5sr-tag').first().textContent(), /估算挂售到账 ¥124.84/);
     await page.locator('[data-only]').check();
     assert.ok(await page.locator('.c5sr-hidden').count() > 0);
@@ -142,3 +141,5 @@ if (process.argv.includes('--browser')) (async () => {
   } catch(e) { console.log('Failure URL:',page.url()); await page.screenshot({path:path.join(__dirname,'research/failure.png')}); throw e; }
   finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+
+

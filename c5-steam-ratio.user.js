@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         C5 DOTA2 Steam 余额比例分析
 // @namespace    https://github.com/imbafu/c5-steam-ratio
-// @version      0.3.0
+// @version      0.3.1
 // @description  C5 刀塔2列表的比例、费后余额、成交活跃度与候选筛选；手动低频查询
 // @match        https://www.c5game.com/*
 // @match        https://c5game.com/*
@@ -20,7 +20,7 @@
   'use strict';
   const KEY = 'c5sr:v1:';
   const TTL = 5 * 60 * 1000;
-  const defaults = { maxDiscount: 0.77, minPrice:250, minVolume: 30, maxGap: 15, maxSpread: 5, haircut: 3, extraCost: 0, maxPrice: 5000, only: false, sort: 'discount' };
+  const defaults = { maxDiscount: 0.77, minPrice:200, minVolume: 30, maxGap: 15, maxSpread: 5, haircut: 3, extraCost: 0, maxPrice: 5000, only: false, sort: 'discount' };
   function number(text) {
     const match = String(text).replace(/\s/g, '').match(/(?:¥|￥)\s*([\d,]+(?:\.\d+)?)/);
     return match ? Number(match[1].replace(/,/g, '')) : NaN;
@@ -62,7 +62,7 @@
     const bidDiscount = bidNet > 0 ? total / bidNet : null;
     const spread = bookFresh && book.ask > 0 && book.bid > 0 && book.ask >= book.bid ? (book.ask - book.bid) / book.ask * 100 : null;
     const referenceMet = discount <= settings.maxDiscount;
-    const watch = fresh && !special && Number.isSafeInteger(quote.volume) && quote.volume >= settings.minVolume && gap !== null && gap <= settings.maxGap && discount < 1 && cost > settings.minPrice && cost <= settings.maxPrice;
+    const watch = fresh && !special && Number.isSafeInteger(quote.volume) && quote.volume >= settings.minVolume && gap !== null && gap <= settings.maxGap && discount < 1 && cost >= settings.minPrice && cost <= settings.maxPrice;
     const candidate = watch && bidDiscount !== null && spread !== null && spread <= settings.maxSpread && book.topQuantity > 0;
     const instant = candidate && bidDiscount < 1;
     const maxBuyPrice = Math.max(0, Math.floor((net * settings.maxDiscount - settings.extraCost) * 100 + 1e-7) / 100);
@@ -151,7 +151,8 @@
   if (!storage.get('pricePreferenceMigration',false)) { settings.minPrice=250; if(settings.maxPrice===500)settings.maxPrice=5000; storage.set('settings',settings);storage.set('pricePreferenceMigration',true); }
   if (!['original','discount','bidDiscount','volume','gain'].includes(settings.sort)) settings.sort = 'discount';
   const panel = document.createElement('section'); panel.id = 'c5sr-panel';
-  panel.innerHTML = `<strong>C5 → Steam 买入推荐</strong> <span>成本 ÷ Steam扣费后到账 · 越低越好 · 单件优先超过¥250</span>
+  if (!storage.get('minimum200Migration',false)) { settings.minPrice=200; settings.sort='discount'; storage.set('settings',settings); storage.set('minimum200Migration',true); }
+  panel.innerHTML = `<strong>C5 → Steam 买入推荐</strong> <span>成本 ÷ Steam扣费后到账 · 越低越好 · 单件至少¥200</span>
     <details><summary>筛选与估算设置</summary><div class="c5sr-settings"></div></details>
     <div><button data-action="query">查询本页（最多10件/20次请求）</button> <button data-action="stop">停止</button> <button data-action="clear">清除本页缓存</button>
     <select aria-label="排序"><option value="original">原顺序</option><option value="discount">挂售成本比例升序</option><option value="bidDiscount">求购成本比例升序</option><option value="volume">成交量降序</option><option value="gain">余额增量降序</option></select>
@@ -162,7 +163,7 @@
   style.textContent = `#c5sr-panel{background:#142333;color:#eef3fa;border:1px solid #3e566c;border-radius:8px;padding:14px;margin:12px 0;font:14px/1.6 sans-serif}#c5sr-panel button,#c5sr-panel select,#c5sr-panel input{color:#18232f;background:#fff;border-radius:4px;padding:4px;margin:4px}#c5sr-panel input[type=number]{width:82px}.c5sr-settings{display:flex;flex-wrap:wrap;gap:12px}.c5sr-tag{font:12px/1.7 sans-serif;padding:8px;background:#eaf0f6;color:#223344;white-space:normal;border-radius:4px}.c5sr-candidate{background:#d8f4df;color:#154825}.c5sr-ranking a{color:#9ad5ff}.c5sr-ranking{max-height:250px;overflow:auto}.c5sr-hidden{display:none!important}`;
   document.head.append(style);
   style.textContent += '.c5sr-ranking table{border-collapse:collapse;min-width:950px;width:100%;font-size:12px}.c5sr-ranking th,.c5sr-ranking td{padding:7px;border-bottom:1px solid #3e566c;text-align:left}.c5sr-ranking th{white-space:nowrap}.c5sr-ranking{max-height:360px}.c5sr-ranking td a{display:block}';
-  const labels = { maxDiscount: '挂售参考比例', minPrice:'单件买入价高于¥', minVolume: '最低Steam近期成交量', maxGap: '最大中位价偏差%', maxSpread:'最大盘口价差%', haircut: '售价折让%', extraCost: '单件额外成本¥', maxPrice: '最高C5售价¥' };
+  const labels = { maxDiscount: '挂售参考比例', minPrice:'最低单件买入价¥', minVolume: '最低Steam近期成交量', maxGap: '最大中位价偏差%', maxSpread:'最大盘口价差%', haircut: '售价折让%', extraCost: '单件额外成本¥', maxPrice: '最高C5售价¥' };
   for (const [key, label] of Object.entries(labels)) {
     const wrap = document.createElement('label'); wrap.textContent = label;
     const input = document.createElement('input'); input.type = 'number'; input.step = key === 'minVolume' ? '1' : '0.01'; input.min = limits[key][0]; input.max = limits[key][1]; input.value = settings[key];
@@ -200,7 +201,7 @@
   }
   const money = n => Number.isFinite(n) ? `¥${n.toFixed(2)}` : '未知';
   function render() {
-    panel.querySelector('span').textContent = `成本 ÷ Steam扣费后到账 · 越低越好 · 参考${settings.maxDiscount}（不硬筛）· 单件>${money(settings.minPrice)}`;
+    panel.querySelector('span').textContent = `成本 ÷ Steam扣费后到账 · 越低越好 · 参考${settings.maxDiscount}（不硬筛）· 单件≥${money(settings.minPrice)}`;
     const ranked = [];
     for (const c of cards) {
       const q = c.hash ? cached(c.hash) : null;
@@ -220,12 +221,12 @@
     const ranking = panel.querySelector('.c5sr-ranking'); ranking.replaceChildren();
     const summary = document.createElement('strong'); summary.textContent = `本页已报价 ${ranked.length}/${cards.length} 件；推荐 ${ranked.filter(x=>x.a.candidate).length} 件，其中求购可成交 ${ranked.filter(x=>x.a.instant).length} 件。`; ranking.append(summary);
     if (settings.sort !== 'original') {
-      ranked.sort((x,y) => Number(y.a.candidate)-Number(x.a.candidate) || Number(y.c.price>settings.minPrice)-Number(x.c.price>settings.minPrice) || (settings.sort === 'volume' ? (y.q.volume ?? -1)-(x.q.volume ?? -1) : settings.sort === 'gain' ? y.a.gain-x.a.gain : (x.a[settings.sort] ?? Infinity)-(y.a[settings.sort] ?? Infinity)) || x.c.index-y.c.index);
+      ranked.sort((x,y) => (settings.sort === 'volume' ? (y.q.volume ?? -1)-(x.q.volume ?? -1) : settings.sort === 'gain' ? y.a.gain-x.a.gain : (x.a[settings.sort] ?? Infinity)-(y.a[settings.sort] ?? Infinity)) || x.c.index-y.c.index);
       if (!ranked.some(x=>x.a.candidate)) { const empty=document.createElement('p'); empty.textContent='暂无符合门槛且流动性已核验的推荐。下方是待核验/未达标对照，不代表建议买入。'; ranking.append(empty); }
       const table=document.createElement('table'); const head=document.createElement('tr');
       for(const label of ['状态','饰品','买入价','挂售到账估算','成本比例','近期成交量','求购到账','顶档件数','达到参考值的买价上限']) { const th=document.createElement('th'); th.textContent=label; head.append(th); }
       table.append(head);
-      for (const { c, a } of ranked.filter(x => !settings.only || x.a.candidate)) {
+      for (const { c, a } of ranked.filter(x => x.c.price >= settings.minPrice && (!settings.only || x.a.candidate))) {
         const row = document.createElement('tr'), link = document.createElement('a');
         link.href = c.col.querySelector('a').href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = c.name;
         const steam = document.createElement('a'); steam.href=`https://steamcommunity.com/market/listings/570/${encodeURIComponent(c.hash)}`; steam.target='_blank'; steam.rel='noopener noreferrer'; steam.textContent='Steam核验';
@@ -300,3 +301,5 @@
   setInterval(() => { if (panel.isConnected && !running) render(); },15000);
   scan();
 })();
+
+
