@@ -1,3 +1,6 @@
 research/
 node_modules/
 *.log
+.credentials/
+*.dpapi
+
