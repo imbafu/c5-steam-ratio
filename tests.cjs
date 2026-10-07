@@ -16,6 +16,7 @@ for (let gross = 0; gross <= 100000; gross++) {
   } else assert.equal(net, 0);
 }
 assert.equal(netCents(11500), 10000);
+assert.equal(netCents(60000), 52175); // User verified Steam sell dialog.
 assert.equal(netCents(3), 1);
 assert.equal(netCents(2), 0);
 const quote = parseQuote({ success: true, lowest_price: '¥ 1,234.56', median_price: '¥ 1,200.00', volume: '1,234' }, 1000);
@@ -29,8 +30,10 @@ const book = parseBook({data:{success:true,data:{eCurrency:23,amtMaxBuyOrder:145
 assert.equal(analyze(90,{...q,book},defaults,1000).candidate,true);
 assert.equal(analyze(90,{...q,book},defaults,1000).instant,true);
 assert.equal(analyze(100,{...q,book},defaults,1000).candidate,true);
-assert.equal(analyze(100,{...q,book},defaults,1000).referenceMet,false);
+assert.equal(analyze(101,{...q,book},defaults,1000).referenceMet,false);
 const computed=analyze(90,q,defaults,1000);
+assert.equal(computed.net,130.44);
+assert.equal(analyze(90,q,{...defaults,haircut:3},1000).net,130.44);
 assert.equal(computed.discount,90/computed.net);
 assert.ok((computed.maxBuyPrice+defaults.extraCost)/computed.net<=0.77);
 assert.ok((computed.maxBuyPrice+0.01+defaults.extraCost)/computed.net>0.77);
@@ -105,7 +108,7 @@ if (process.argv.includes('--browser')) (async () => {
     assert.ok(await page.locator('.c5sr-ranking a').count() > 0);
     const rows=await page.locator('.c5sr-ranking tr').evaluateAll(rows=>rows.slice(1).map(r=>({price:Number(r.children[2].textContent.replace('¥','')),cost:Number(r.children[4].textContent)})));
     assert.ok(rows.every((r,i)=>r.price>=200 && (i===0 || r.cost>=rows[i-1].cost)),'all rows meet minimum and sort by ascending ratio');
-    assert.match(await page.locator('.c5sr-tag').first().textContent(), /估算挂售到账 ¥124.84/);
+    assert.match(await page.locator('.c5sr-tag').first().textContent(), /估算挂售到账 ¥130.44/);
     await page.locator('[data-only]').check();
     assert.ok(await page.locator('.c5sr-hidden').count() > 0);
     await page.locator('[data-only]').uncheck();
@@ -141,5 +144,7 @@ if (process.argv.includes('--browser')) (async () => {
   } catch(e) { console.log('Failure URL:',page.url()); await page.screenshot({path:path.join(__dirname,'research/failure.png')}); throw e; }
   finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+
+
 
 
