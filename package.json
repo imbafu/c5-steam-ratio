@@ -1,6 +1,6 @@
 {
   "name": "c5-steam-ratio",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "C5 DOTA2 Steam wallet ratio userscript",
   "scripts": { "test": "node tests.cjs", "test:browser": "node tests.cjs --browser" },

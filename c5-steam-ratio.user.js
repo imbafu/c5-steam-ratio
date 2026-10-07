@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         C5 DOTA2 Steam 余额比例分析
 // @namespace    https://github.com/imbafu/c5-steam-ratio
-// @version      0.1.0
+// @version      0.3.0
 // @description  C5 刀塔2列表的比例、费后余额、成交活跃度与候选筛选；手动低频查询
 // @match        https://www.c5game.com/*
 // @match        https://c5game.com/*
+// @match        https://steamcommunity.com/market/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -18,8 +19,8 @@
 (function () {
   'use strict';
   const KEY = 'c5sr:v1:';
-  const TTL = 30 * 60 * 1000;
-  const defaults = { minRatio: 1.15, minBidRatio: 1.05, minVolume: 30, maxGap: 15, maxSpread: 5, haircut: 3, extraCost: 0, maxPrice: 500, only: false, sort: 'original' };
+  const TTL = 5 * 60 * 1000;
+  const defaults = { maxDiscount: 0.77, minPrice:250, minVolume: 30, maxGap: 15, maxSpread: 5, haircut: 3, extraCost: 0, maxPrice: 5000, only: false, sort: 'discount' };
   function number(text) {
     const match = String(text).replace(/\s/g, '').match(/(?:¥|￥)\s*([\d,]+(?:\.\d+)?)/);
     return match ? Number(match[1].replace(/,/g, '')) : NaN;
@@ -57,10 +58,25 @@
     const bookFresh = book && at >= book.at && at - book.at < 5 * 60000;
     const bidNet = bookFresh && book.currency === 23 && book.bid > 0 ? netCents(book.bid) / 100 : null;
     const bidRatio = bidNet === null ? null : bidNet / total;
+    const discount = net > 0 ? total / net : Infinity;
+    const bidDiscount = bidNet > 0 ? total / bidNet : null;
     const spread = bookFresh && book.ask > 0 && book.bid > 0 && book.ask >= book.bid ? (book.ask - book.bid) / book.ask * 100 : null;
-    const watch = fresh && !special && quote.volume !== null && quote.volume >= settings.minVolume && gap !== null && gap <= settings.maxGap && netRatio >= settings.minRatio && cost <= settings.maxPrice;
-    const candidate = watch && bidRatio !== null && bidRatio >= settings.minBidRatio && spread !== null && spread <= settings.maxSpread && book.topQuantity > 0;
-    return { ratio, netRatio, net, gain: net - total, gap, fresh, watch, candidate, bidNet, bidRatio, spread, bookFresh };
+    const referenceMet = discount <= settings.maxDiscount;
+    const watch = fresh && !special && Number.isSafeInteger(quote.volume) && quote.volume >= settings.minVolume && gap !== null && gap <= settings.maxGap && discount < 1 && cost > settings.minPrice && cost <= settings.maxPrice;
+    const candidate = watch && bidDiscount !== null && spread !== null && spread <= settings.maxSpread && book.topQuantity > 0;
+    const instant = candidate && bidDiscount < 1;
+    const maxBuyPrice = Math.max(0, Math.floor((net * settings.maxDiscount - settings.extraCost) * 100 + 1e-7) / 100);
+    return { ratio, netRatio, discount, bidDiscount, maxBuyPrice, referenceMet, net, gain: net - total, gap, fresh, watch, candidate, instant, bidNet, bidRatio, spread, bookFresh };
+  }
+  function pageBook(ssr, hash, at = Date.now()) {
+    let queryData = ssr?.renderContext?.queryData;
+    if (typeof queryData === 'string') queryData = JSON.parse(queryData);
+    const query = queryData?.queries?.find(q => q.queryKey?.[0] === 'market' && q.queryKey?.[1] === 'orderbook' && q.queryKey?.[2] === 570 && q.queryKey?.[3] === hash);
+    if (!query || query.state?.status !== 'success') throw new Error('此页没有对应饰品的公开求购数据');
+    // Keep the source timestamp; opening an old page must not rejuvenate its quote.
+    const sourceAt = query.state.dataUpdatedAt;
+    if (!Number.isFinite(sourceAt) || sourceAt > at || at - sourceAt >= TTL) throw new Error('此页盘口已过期，请正常刷新Steam页面');
+    return parseBook({data:{success:true,data:query.state.data}},sourceAt);
   }
   function parseBook(json, at = Date.now()) {
     const b = json?.data?.data;
@@ -90,7 +106,7 @@
   }
   // Export only in a non-browser test harness.
   if (typeof document === 'undefined') {
-    if (typeof module !== 'undefined') module.exports = { number, netCents, parseQuote, parseBook, analyze, stateItems, readCards, defaults, TTL };
+    if (typeof module !== 'undefined') module.exports = { number, netCents, parseQuote, parseBook, pageBook, analyze, stateItems, readCards, defaults, TTL };
     return;
   }
   const storage = {
@@ -105,24 +121,48 @@
     while (index.length > 500) GM_deleteValue(KEY + 'quote:' + index.shift());
     storage.set('cacheIndex', index);
   }
+  if (location.hostname === 'steamcommunity.com') {
+    const match = location.pathname.match(/^\/market\/listings\/570\/([^/]+)\/?$/);
+    if (!match) return;
+    let hash; try { hash = decodeURIComponent(match[1]); } catch { return; }
+    const bridge = document.createElement('div');
+    bridge.id = 'c5sr-steam-bridge';
+    bridge.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;background:#142333;color:white;padding:12px;border-radius:8px;max-width:360px;font:14px/1.6 sans-serif';
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = '将本页求购报价用于C5推荐';
+    const result = document.createElement('div'); result.textContent = '只保存当前饰品盘口；不读取或导出登录凭据。';
+    button.onclick = () => {
+      try {
+        let ssr = unsafeWindow.SSR;
+        const dataNode = document.getElementById('valve-ssr-data');
+        if (!ssr?.renderContext?.queryData && dataNode) ssr = JSON.parse(dataNode.textContent);
+        const book = pageBook(ssr, hash);
+        storage.set('pageBook:' + hash, book);
+        result.textContent = book.currency === 23 ? `已保存人民币求购 ¥${(book.bid/100).toFixed(2)}，顶档${book.topQuantity ?? '未知'}件。返回C5重新查询/调整筛选即可读取。` : `此页实际盘口币种编号${book.currency}，不会用于人民币收益。`;
+      } catch(e) { result.textContent = e.message; }
+    };
+    bridge.append(button,result); document.body.append(bridge); return;
+  }
   let settings = { ...defaults }, cards = [], running = false, stop = false, timer;
   const stored = storage.get('settings', {});
   for (const k of Object.keys(defaults)) if (typeof stored[k] === typeof defaults[k]) settings[k] = stored[k];
-  const limits = { minRatio: [0.1, 10], minBidRatio: [0.1, 10], minVolume: [0, 1000000], maxGap: [0, 100], maxSpread:[0,100], haircut: [0, 50], extraCost: [0, 10000], maxPrice: [0.01, 1000000] };
+  const limits = { maxDiscount: [0.01, 10], minPrice:[0,1000000], minVolume: [0, 1000000], maxGap: [0, 100], maxSpread:[0,100], haircut: [0, 50], extraCost: [0, 10000], maxPrice: [0.01, 1000000] };
   for (const [k, [min, max]] of Object.entries(limits)) if (!Number.isFinite(settings[k]) || settings[k] < min || settings[k] > max) settings[k] = defaults[k];
-  if (!['original','netRatio','bidRatio','volume','gain'].includes(settings.sort)) settings.sort = 'original';
+  if (!storage.get('discountMigration',false)) { settings.maxDiscount=0.77; settings.sort='discount'; storage.set('settings',settings); storage.set('discountMigration',true); }
+  if (!storage.get('pricePreferenceMigration',false)) { settings.minPrice=250; if(settings.maxPrice===500)settings.maxPrice=5000; storage.set('settings',settings);storage.set('pricePreferenceMigration',true); }
+  if (!['original','discount','bidDiscount','volume','gain'].includes(settings.sort)) settings.sort = 'discount';
   const panel = document.createElement('section'); panel.id = 'c5sr-panel';
-  panel.innerHTML = `<strong>C5 → Steam 余额</strong> <span>人民币 · 比例越高越好</span>
+  panel.innerHTML = `<strong>C5 → Steam 买入推荐</strong> <span>成本 ÷ Steam扣费后到账 · 越低越好 · 单件优先超过¥250</span>
     <details><summary>筛选与估算设置</summary><div class="c5sr-settings"></div></details>
     <div><button data-action="query">查询本页（最多10件/20次请求）</button> <button data-action="stop">停止</button> <button data-action="clear">清除本页缓存</button>
-    <select aria-label="排序"><option value="original">原顺序</option><option value="netRatio">挂单费后比例降序</option><option value="bidRatio">人民币求购费后比例降序</option><option value="volume">成交量降序</option><option value="gain">余额增量降序</option></select>
+    <select aria-label="排序"><option value="original">原顺序</option><option value="discount">挂售成本比例升序</option><option value="bidDiscount">求购成本比例升序</option><option value="volume">成交量降序</option><option value="gain">余额增量降序</option></select>
     <label><input type="checkbox" data-only>只看候选</label></div>
-    <p class="c5sr-status"></p><small>最低挂单 ≠ 即时成交；余额不能提现。偏差是最低挂单与成交中位价的差异，并非买卖盘口价差。特殊宝石/独特饰品需人工核验。</small>
+    <p class="c5sr-status"></p><small>挂售到账是估算；求购报价仅适用于当前顶档数量。买入前核对实际支付价、可交易/可上市时间及款式宝石。成交量不保证售出速度，Steam余额不能提现。</small>
     <div class="c5sr-ranking"></div>`;
   const style = document.createElement('style');
   style.textContent = `#c5sr-panel{background:#142333;color:#eef3fa;border:1px solid #3e566c;border-radius:8px;padding:14px;margin:12px 0;font:14px/1.6 sans-serif}#c5sr-panel button,#c5sr-panel select,#c5sr-panel input{color:#18232f;background:#fff;border-radius:4px;padding:4px;margin:4px}#c5sr-panel input[type=number]{width:82px}.c5sr-settings{display:flex;flex-wrap:wrap;gap:12px}.c5sr-tag{font:12px/1.7 sans-serif;padding:8px;background:#eaf0f6;color:#223344;white-space:normal;border-radius:4px}.c5sr-candidate{background:#d8f4df;color:#154825}.c5sr-ranking a{color:#9ad5ff}.c5sr-ranking{max-height:250px;overflow:auto}.c5sr-hidden{display:none!important}`;
   document.head.append(style);
-  const labels = { minRatio: '最低挂单费后比例', minBidRatio:'最低人民币求购费后比例', minVolume: '最低Steam近24h成交量', maxGap: '最大中位价偏差%', maxSpread:'最大盘口价差%', haircut: '售价折让%', extraCost: '单件额外成本¥', maxPrice: '最高C5售价¥' };
+  style.textContent += '.c5sr-ranking table{border-collapse:collapse;min-width:950px;width:100%;font-size:12px}.c5sr-ranking th,.c5sr-ranking td{padding:7px;border-bottom:1px solid #3e566c;text-align:left}.c5sr-ranking th{white-space:nowrap}.c5sr-ranking{max-height:360px}.c5sr-ranking td a{display:block}';
+  const labels = { maxDiscount: '挂售参考比例', minPrice:'单件买入价高于¥', minVolume: '最低Steam近期成交量', maxGap: '最大中位价偏差%', maxSpread:'最大盘口价差%', haircut: '售价折让%', extraCost: '单件额外成本¥', maxPrice: '最高C5售价¥' };
   for (const [key, label] of Object.entries(labels)) {
     const wrap = document.createElement('label'); wrap.textContent = label;
     const input = document.createElement('input'); input.type = 'number'; input.step = key === 'minVolume' ? '1' : '0.01'; input.min = limits[key][0]; input.max = limits[key][1]; input.value = settings[key];
@@ -137,6 +177,8 @@
   function cached(hash) {
     const q = storage.get('quote:' + hash, null);
     if (!q || !Number.isFinite(q.lowest) || !(q.lowest > 0) || !Number.isFinite(q.at)) return null;
+    const fromPage = storage.get('pageBook:' + hash,null);
+    if (fromPage?.currency === 23 && Number.isFinite(fromPage.at) && Date.now() >= fromPage.at && Date.now()-fromPage.at < TTL && (!q.book || q.book.currency !== 23 || fromPage.at > q.book.at)) return {...q,book:fromPage};
     return q;
   }
   function scan() {
@@ -158,6 +200,7 @@
   }
   const money = n => Number.isFinite(n) ? `¥${n.toFixed(2)}` : '未知';
   function render() {
+    panel.querySelector('span').textContent = `成本 ÷ Steam扣费后到账 · 越低越好 · 参考${settings.maxDiscount}（不硬筛）· 单件>${money(settings.minPrice)}`;
     const ranked = [];
     for (const c of cards) {
       const q = c.hash ? cached(c.hash) : null;
@@ -166,28 +209,39 @@
       let tag = c.card.querySelector('.c5sr-tag');
       if (!tag) { tag = document.createElement('div'); tag.className = 'c5sr-tag'; c.card.append(tag); }
       tag.classList.toggle('c5sr-candidate', !!a?.candidate);
-      const bookText = q?.book && a?.bookFresh ? `求购 ${q.book.currency === 23 ? 'CNY' : q.book.currency === 11 ? 'MYR' : '币种#'+q.book.currency} ${(q.book.bid/100).toFixed(2)} · 顶档 ${q.book.topQuantity ?? '未知'}件 / 总求购 ${q.book.totalBuy ?? '未知'}件\n盘口价差 ${a.spread === null ? '未知' : a.spread.toFixed(1)+'%'} · 人民币求购费后比例 ${a.bidRatio === null ? '未确认，暂不推荐' : a.bidRatio.toFixed(3)}` : '求购盘口未查询或已过期，暂不推荐';
-      tag.textContent = !c.hash ? '未找到精确市场名，暂不估算' : !a ? (c.error || 'Steam报价未查询') : `${a.candidate ? '★ 买入核验候选' : a.watch ? '挂单比例候选 · 求购待确认' : '观察'}${a.fresh ? '' : ' · 缓存已过期'}\nSteam ${money(q.lowest)} / C5 ${money(c.price)} = ${a.ratio.toFixed(3)}\n挂单费后 ${money(a.net)} · 比例 ${a.netRatio.toFixed(3)} · 余额增量 ${money(a.gain)}\n近24h成交 ${q.volume ?? '未知'} · 中位价偏差 ${a.gap === null ? '未知' : a.gap.toFixed(1) + '%'}\n${bookText}${special ? ' · 特殊属性需核验' : ''}${c.error ? '\n'+c.error : ''}`;
+      const bookText = q?.book && a?.bookFresh ? `求购 ${q.book.currency === 23 ? 'CNY' : q.book.currency === 11 ? 'MYR' : '币种#'+q.book.currency} ${(q.book.bid/100).toFixed(2)} · 顶档 ${q.book.topQuantity ?? '未知'}件 / 总求购 ${q.book.totalBuy ?? '未知'}件\n盘口价差 ${a.spread === null ? '未知' : a.spread.toFixed(1)+'%'} · 求购成本比例 ${a.bidDiscount === null ? '币种未确认' : a.bidDiscount.toFixed(3)}` : '求购盘口未查询或已过期，暂不推荐';
+      tag.textContent = !c.hash ? '未找到精确市场名，暂不估算' : !a ? (c.error || 'Steam报价未查询') : `${a.instant ? '★ 求购可成交候选' : a.candidate ? '★ 挂售候选（需等成交）' : a.watch ? '价格可考虑 · 流动性待核验' : '未达推荐条件'}${a.fresh ? '' : ' · 报价已过期'}\nC5 ${money(c.price)} · 估算挂售到账 ${money(a.net)}\n成本 ÷ 扣费到账 = ${a.discount.toFixed(3)} · ${a.referenceMet?'达到参考值':'高于参考值，但不因此排除'}\n参考比例买价上限 ${money(a.maxBuyPrice)} · 余额增量 ${money(a.gain)}\n近期成交 ${q.volume ?? '未知'} · 中位价偏差 ${a.gap === null ? '未知' : a.gap.toFixed(1) + '%'}\n${bookText}${special ? ' · 特殊属性需核验' : ''}${c.error ? '\n'+c.error : ''}`;
       tag.style.whiteSpace = 'pre-line';
-      tag.title = q ? `报价时间：${new Date(q.at).toLocaleString()}；Steam最低挂单价与中位价取低，再折让${settings.haircut}%，扣手续费。无买单深度，无法估计立即卖出收益。` : '';
+      tag.title = q ? `报价时间：${new Date(q.at).toLocaleString()}；Steam最低挂单价与中位价取低，再折让${settings.haircut}%，扣手续费。挂售到账属于估算；求购到账只适用于当前顶档数量。` : '';
       c.col.classList.toggle('c5sr-hidden', settings.only && !a?.candidate);
       // Avoid moving framework-owned DOM: present a separately sorted list.
       if (a) ranked.push({ c, q, a });
     }
     const ranking = panel.querySelector('.c5sr-ranking'); ranking.replaceChildren();
+    const summary = document.createElement('strong'); summary.textContent = `本页已报价 ${ranked.length}/${cards.length} 件；推荐 ${ranked.filter(x=>x.a.candidate).length} 件，其中求购可成交 ${ranked.filter(x=>x.a.instant).length} 件。`; ranking.append(summary);
     if (settings.sort !== 'original') {
-      ranked.sort((x, y) => (settings.sort === 'volume' ? (y.q.volume ?? -1) - (x.q.volume ?? -1) : (y.a[settings.sort] ?? -1) - (x.a[settings.sort] ?? -1)) || x.c.index - y.c.index);
+      ranked.sort((x,y) => Number(y.a.candidate)-Number(x.a.candidate) || Number(y.c.price>settings.minPrice)-Number(x.c.price>settings.minPrice) || (settings.sort === 'volume' ? (y.q.volume ?? -1)-(x.q.volume ?? -1) : settings.sort === 'gain' ? y.a.gain-x.a.gain : (x.a[settings.sort] ?? Infinity)-(y.a[settings.sort] ?? Infinity)) || x.c.index-y.c.index);
+      if (!ranked.some(x=>x.a.candidate)) { const empty=document.createElement('p'); empty.textContent='暂无符合门槛且流动性已核验的推荐。下方是待核验/未达标对照，不代表建议买入。'; ranking.append(empty); }
+      const table=document.createElement('table'); const head=document.createElement('tr');
+      for(const label of ['状态','饰品','买入价','挂售到账估算','成本比例','近期成交量','求购到账','顶档件数','达到参考值的买价上限']) { const th=document.createElement('th'); th.textContent=label; head.append(th); }
+      table.append(head);
       for (const { c, a } of ranked.filter(x => !settings.only || x.a.candidate)) {
-        const row = document.createElement('div'), link = document.createElement('a');
+        const row = document.createElement('tr'), link = document.createElement('a');
         link.href = c.col.querySelector('a').href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = c.name;
-        row.append(link, ` — 费后比例 ${a.netRatio.toFixed(3)} · 余额增量 ${money(a.gain)}${a.fresh ? '' : ' · 已过期'}`); ranking.append(row);
+        const steam = document.createElement('a'); steam.href=`https://steamcommunity.com/market/listings/570/${encodeURIComponent(c.hash)}`; steam.target='_blank'; steam.rel='noopener noreferrer'; steam.textContent='Steam核验';
+        const q=cached(c.hash);
+        const values=[a.instant?'求购可成交候选':a.candidate?'挂售候选':'待核验/未达标',null,money(c.price),money(a.net),a.discount.toFixed(3),q?.volume??'未知',money(a.bidNet),a.bookFresh?q?.book?.topQuantity??'未知':'未知',money(a.maxBuyPrice)];
+        for(let i=0;i<values.length;i++){const td=document.createElement('td');if(i===1)td.append(link,steam);else td.textContent=values[i];row.append(td);}
+        if(!a.fresh) row.firstChild.textContent='报价已过期';
+        table.append(row);
       }
+      ranking.append(table);
     }
   }
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   function request(hash, isBook = false) {
     return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({ method: 'GET', url: isBook ? `https://steamcommunity.com/market/orderbook?q=Load&qp=${encodeURIComponent(JSON.stringify([570,hash]))}&currency=23` : `https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=${encodeURIComponent(hash)}`, ...(isBook ? {headers:{'x-valve-request-type':'queryAction'}} : {}), anonymous: true, timeout: 15000,
+      GM_xmlhttpRequest({ method: 'GET', url: isBook ? `https://steamcommunity.com/market/orderbook?q=Load&qp=${encodeURIComponent(JSON.stringify([570,hash]))}&currency=23` : `https://steamcommunity.com/market/priceoverview/?appid=570&currency=23&market_hash_name=${encodeURIComponent(hash)}`, ...(isBook ? {headers:{'x-valve-request-type':'queryAction'}} : {}), anonymous: false, timeout: 15000,
         onload(r) {
           if ([401, 403, 429].includes(r.status) || /captcha|g-recaptcha|cf-chl|sign in/i.test(r.responseText.slice(0,500))) {
             storage.set('cooldown', Date.now() + (r.status === 429 ? 30 : 15) * 60000);
@@ -231,7 +285,7 @@
         catch (e) { c.error = e.message; throw e; }
         render();
       }
-      status(stop ? '已停止；已取得的报价已缓存。' : '本批查询结束。报价缓存30分钟；排序与筛选不会发起请求。');
+      status(stop ? '已停止；已取得的报价已缓存。' : '本批查询结束。报价与盘口缓存5分钟；排序与筛选不会发起请求。');
     } catch (e) { status(e.message); }
     finally { running = false; if (storage.get('lease', {}).owner === owner) storage.set('lease', { until: 0 }); render(); }
   }
@@ -242,5 +296,7 @@
     if (records.every(r => r.target.closest?.('#c5sr-panel,.c5sr-tag') || ([...r.addedNodes, ...r.removedNodes].length > 0 && [...r.addedNodes, ...r.removedNodes].every(n => n.nodeType === 1 && n.matches?.('.c5sr-tag,#c5sr-panel'))))) return;
     clearTimeout(timer); timer = setTimeout(scan, 400);
   }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  // Refresh freshness labels even when the user leaves the page idle; no requests.
+  setInterval(() => { if (panel.isConnected && !running) render(); },15000);
   scan();
 })();
